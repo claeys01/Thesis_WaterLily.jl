@@ -1,3 +1,6 @@
+using TimerOutputs: @timeit, get_timer
+
+
 @inline ∂(a,I::CartesianIndex{d},f::AbstractArray{T,d}) where {T,d} = @inbounds f[I]-f[I-δ(a,I)]
 @inline ∂(a,I::CartesianIndex{m},u::AbstractArray{T,n}) where {T,n,m} = @inbounds u[I+δ(a,I),a]-u[I,a]
 @inline ϕ(a,I,f) = @inbounds (f[I]+f[I-δ(a,I)])/2
@@ -145,23 +148,45 @@ Integrate the `Flow` one time step using the [Boundary Data Immersion Method](ht
 and the `AbstractPoisson` pressure solver to project the velocity onto an incompressible flow.
 """
 @fastmath function mom_step!(a::Flow{N},b::AbstractPoisson;λ=quick,udf=nothing,kwargs...) where N
+    to = get(kwargs, :timer, nothing)
     a.u⁰ .= a.u; scale_u!(a,0); t₁ = sum(a.Δt); t₀ = t₁-a.Δt[end]
-    # predictor u → u'
-    @log "p"
-    conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
-    udf!(a,udf,t₀; kwargs...)
-    accelerate!(a.f,t₀,a.g,a.uBC)
-    BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # BC MUST be at t₁
-    a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end]) # convective exit
-    project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-    # corrector u → u¹
-    @log "c"
-    conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
-    udf!(a,udf,t₁; kwargs...)
-    accelerate!(a.f,t₁,a.g,a.uBC)
-    BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-    project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-    push!(a.Δt,CFL(a))
+    if isnothing(to)
+        # predictor
+        @log "p"
+        conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
+        udf!(a,udf,t₀; kwargs...)
+        accelerate!(a.f,t₀,a.g,a.uBC)
+        BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
+        project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        # corrector
+        @log "c"
+        conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
+        udf!(a,udf,t₁; kwargs...)
+        accelerate!(a.f,t₁,a.g,a.uBC)
+        BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        push!(a.Δt,CFL(a))
+    else
+        @timeit to "predictor" begin
+            @timeit to "p" @log "p"
+            @timeit to "conv_diff" conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
+            @timeit to "udf" udf!(a,udf,t₀; kwargs...)
+            @timeit to "accelerate" accelerate!(a.f,t₀,a.g,a.uBC)
+            @timeit to "BDIM" BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "exitBC" a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
+            @timeit to "project" project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        end
+        @timeit to "corrector" begin
+            @timeit to "c" @log "c"
+            @timeit to "conv_diff" conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
+            @timeit to "udf" udf!(a,udf,t₁; kwargs...)
+            @timeit to "accelerate" accelerate!(a.f,t₁,a.g,a.uBC)
+            @timeit to "BDIM" BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "project" project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "push" push!(a.Δt,CFL(a))
+        end
+    end
 end
 scale_u!(a,scale) = @loop a.u[Ii] *= scale over Ii ∈ inside_u(size(a.p))
 

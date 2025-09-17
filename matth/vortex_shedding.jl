@@ -1,16 +1,10 @@
 using WaterLily
 using CUDA
-using Plots
-
-# include("vortex_shedding.jl")
-
-@assert CUDA.functional()
-# simulation of a flow around a cilinder that exhibits vortex shedding
-
-start = time()
 
 # Define simulation size, geometry dimensions, viscosity
-function circle(n, m, Re=250, U=1; mem=Array)
+function circle_shedding(Re=250, U=1; mem=Array)
+    n = 3*2^7
+    m = 2^7
     radius = Float32(m / 16) # radius of the circle relative to the height of the domain
     center = Float32(m / 2) # location of the circle relative to the height of the domain
 
@@ -19,24 +13,20 @@ function circle(n, m, Re=250, U=1; mem=Array)
     visc = St * Re / (f * (2*radius)^2)
 
     sdf(x,t) = √sum(abs2, x .- center) - radius
-    Simulation(
-        (n, m),          # domain size
-        (U, 0),          # flow velocity
-        2f0radius; ν=visc, # defining viscosity
-        body=AutoBody(sdf),
-        mem
-    )
+    sim = Simulation(
+            (n, m),          # domain size
+            (U, 0),          # flow velocity
+            2f0radius; ν=visc, # defining viscosity
+            body=AutoBody(sdf),
+            mem
+        )
+    perturb!(sim; noise=0.1)
+    sim
 end
+# sim = circle_shedding(mem=CUDA.CuArray)
 
-x=3*2^7
-y=2^7
-
-sim = circle(x, y; mem=CuArray)
-t_end = 10
-
-perturb!(sim; noise=0.1)
-
-sim_gif!(sim,duration=t_end,clims=(-5,5),xlims=(0,x),ylims=(0,y),plotbody=true)
+# t_end = 50
+# sim_gif!(sim,duration=t_end,clims=(-5,5),plotbody=true)
 # sim_step!(sim)
 
 # u = sim.flow.u[:,:,1] # x velocity
