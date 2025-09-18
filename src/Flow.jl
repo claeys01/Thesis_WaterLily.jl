@@ -131,12 +131,16 @@ function BDIM!(a::Flow)
     @loop a.u[Ii] += μddn(Ii,a.μ₁,a.f)+a.V[Ii]+a.μ₀[Ii]*a.f[Ii] over Ii ∈ inside_u(size(a.p))
 end
 
-function project!(a::Flow{n},b::AbstractPoisson,w=1) where n
+function project!(a::Flow{n},b::AbstractPoisson,w=1;kwargs...) where n
+    to = get(kwargs, :timer, nothing)
     dt = w*a.Δt[end]
     @inside b.z[I] = div(I,a.u); b.x .*= dt # set source term & solution IC
-    solver!(b)
-    for i ∈ 1:n  # apply solution and unscale to recover pressure
-        @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
+    @timeit to "solver!(b)" solver!(b)
+
+    @timeit to "apply pressure correction" begin
+        for i ∈ 1:n  # apply solution and unscale to recover pressure
+            @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
+        end
     end
     b.x ./= dt
 end
@@ -175,7 +179,9 @@ and the `AbstractPoisson` pressure solver to project the velocity onto an incomp
             @timeit to "accelerate" accelerate!(a.f,t₀,a.g,a.uBC)
             @timeit to "BDIM" BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
             @timeit to "exitBC" a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
-            @timeit to "project" project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "predictor project" begin
+                project!(a,b; timer=to); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            end
         end
         @timeit to "corrector" begin
             @timeit to "c" @log "c"
@@ -183,7 +189,9 @@ and the `AbstractPoisson` pressure solver to project the velocity onto an incomp
             @timeit to "udf" udf!(a,udf,t₁; kwargs...)
             @timeit to "accelerate" accelerate!(a.f,t₁,a.g,a.uBC)
             @timeit to "BDIM" BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-            @timeit to "project" project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "corrector project" begin
+                project!(a,b,0.5; timer=to); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            end
             @timeit to "push" push!(a.Δt,CFL(a))
         end
     end

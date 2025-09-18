@@ -10,11 +10,11 @@ includet("../vortex_shedding.jl")
 
 
 sim_shedding = circle_shedding(mem=Array)
-t_end = 50.0
+t_end = 10.0
 
 @timeit to "sim_step!" begin
-    gif = sim_gif!(sim_shedding,duration=t_end,clims=(-5,5),plotbody=true; timer=to)
-    # sim_step!(sim_shedding, t_end; verbose=true)
+    # gif = sim_gif!(sim_shedding,duration=t_end,clims=(-5,5),plotbody=true)
+    sim_step!(sim_shedding, t_end; verbose=true, timer=to)
 end
 
 
@@ -30,5 +30,5 @@ end
 # display(plt)
 
 show(to)
-display(gif)
+# display(gif)
 # reset_timer!(to)
