@@ -135,7 +135,9 @@ function project!(a::Flow{n},b::AbstractPoisson,w=1;kwargs...) where n
     to = get(kwargs, :timer, nothing)
     dt = w*a.Δt[end]
     @inside b.z[I] = div(I,a.u); b.x .*= dt # set source term & solution IC
-    @timeit to "solver!(b)" solver!(b)
+    @timeit to "solver!(b)" begin
+        solver!(b; timer=to)
+    end
 
     @timeit to "apply pressure correction" begin
         for i ∈ 1:n  # apply solution and unscale to recover pressure
