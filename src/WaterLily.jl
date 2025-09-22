@@ -4,6 +4,8 @@ $(README)
 module WaterLily
 
 using DocStringExtensions
+using TimerOutputs
+
 
 include("util.jl")
 export L₂,BC!,@inside,inside,δ,apply!,loc,@log,set_backend,backend
