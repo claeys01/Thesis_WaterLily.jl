@@ -10,7 +10,7 @@ includet("../vortex_shedding.jl")
 
 
 sim_shedding = circle_shedding(mem=Array)
-t_end = 10.0
+t_end = 50.0
 
 @timeit to "sim_step!" begin
     gif = sim_gif!(sim_shedding;duration=t_end,clims=(-5,5),plotbody=true, timer=to)
