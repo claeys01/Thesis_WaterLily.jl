@@ -1,8 +1,11 @@
 using Lux, Optimization, OptimizationOptimisers, Zygote, OrdinaryDiffEq, Plots, LuxCUDA,
-      SciMLSensitivity, Random, ComponentArrays
+      SciMLSensitivity, Random, ComponentArrays, TimerOutputs
 import DiffEqFlux: NeuralODE
 
 CUDA.allowscalar(false) # Makes sure no slow operations are occurring
+
+to = TimerOutput()
+
 
 #rng for Lux.setup
 rng = Xoshiro(0)
@@ -19,8 +22,9 @@ end
 
 prob_trueode = ODEProblem(trueODEfunc, u0, tspan)
 # Make the data into a GPU-based array if the user has a GPU
-ode_data = solve(prob_trueode, Tsit5(); saveat = tsteps)
-ode_data = Array(ode_data) |> gdev
+ode_data = @timeit to "solve true ODE" solve(prob_trueode, Tsit5(); saveat = tsteps)
+ode_data = @timeit to "Put array on GPU" Array(ode_data) |> gdev
+
 
 dudt2 = Chain(x -> x .^ 3, Dense(2, 50, tanh), Dense(50, 2))
 u0 = Float32[2.0; 0.0] |> gdev
