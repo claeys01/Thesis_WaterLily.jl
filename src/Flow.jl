@@ -1,6 +1,3 @@
-using TimerOutputs: @timeit, get_timer
-
-
 @inline ∂(a,I::CartesianIndex{d},f::AbstractArray{T,d}) where {T,d} = @inbounds f[I]-f[I-δ(a,I)]
 @inline ∂(a,I::CartesianIndex{m},u::AbstractArray{T,n}) where {T,n,m} = @inbounds u[I+δ(a,I),a]-u[I,a]
 @inline ϕ(a,I,f) = @inbounds (f[I]+f[I-δ(a,I)])/2
@@ -159,12 +156,12 @@ and the `AbstractPoisson` pressure solver to project the velocity onto an incomp
     if isnothing(to)
         # predictor
         @log "p"
-        conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
-        udf!(a,udf,t₀; kwargs...)
-        accelerate!(a.f,t₀,a.g,a.uBC)
+        conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir) # calculates RHS of momentum equation (diff between advection and diffusion terms)
+        udf!(a,udf,t₀; kwargs...) # used for adding custom forces such as gravity 
+        accelerate!(a.f,t₀,a.g,a.uBC) # accounts for moving reference frame and applied acceleration
         BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
         a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
-        project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # applies pressure correction step
         # corrector
         @log "c"
         conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
