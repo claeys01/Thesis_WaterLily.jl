@@ -31,13 +31,15 @@ function loss_neuralode(p)
 end
 
 # Callback function to observe training
-callback = function (state, l; doplot = false)
+callback = function (state, l; doplot = true)
     println("Current loss: ", l)
     # plot current prediction against data
     if doplot
       pred = predict_neuralode(state.u)
-      plt = scatter(tsteps, ode_data[1, :]; label = "data")
-      scatter!(plt, tsteps, pred[1, :]; label = "prediction")
+    #   plt = scatter(tsteps, ode_data[1, :]; label = "data")
+    #   scatter!(plt, tsteps, pred[1, :]; label = "prediction")
+        plt = plot(ode_data[1, :], ode_data[2, :]; label = "data")
+        plot!(plt, pred[1, :], pred[2, :]; label = "prediction", title = "Neural ODE prediction")
       display(plot(plt))
     end
     return false
