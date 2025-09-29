@@ -50,6 +50,7 @@ function conv_diff!(r,u,Φ,λ::F;ν=0.1,perdir=()) where {F}
         # treatment for upper boundary with BCs
         upperBoundary!(r,u,Φ,ν,i,j,N,λ,Val{tagper}())
     end
+    return r
 end
 
 # Neumann BC Building block
@@ -132,16 +133,25 @@ function project!(a::Flow{n},b::AbstractPoisson,w=1;kwargs...) where n
     to = get(kwargs, :timer, nothing)
     dt = w*a.Δt[end]
     @inside b.z[I] = div(I,a.u); b.x .*= dt # set source term & solution IC
-    @timeit to "solver!(b)" begin
+    if isnothing(to)
         solver!(b; timer=to)
-    end
-
-    @timeit to "apply pressure correction" begin
         for i ∈ 1:n  # apply solution and unscale to recover pressure
             @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
         end
+        b.x ./= dt
+    else
+        @timeit to "solver!(b)" begin
+            solver!(b; timer=to)
+        end
+
+        @timeit to "apply pressure correction" begin
+            for i ∈ 1:n  # apply solution and unscale to recover pressure
+                @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
+            end
+        end
+        b.x ./= dt
     end
-    b.x ./= dt
+   
 end
 
 """
