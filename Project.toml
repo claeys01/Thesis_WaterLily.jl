@@ -4,6 +4,7 @@ authors = ["Gabriel Weymouth <gabriel.weymouth@gmail.com>"]
 version = "1.5.1"
 
 [deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DiffEqFlux = "aae7a2af-3d4f-5e19-a356-7da93b79d9d0"
 DiffEqGPU = "071ae1c0-96b5-11e9-1965-c90190d839ea"
@@ -52,6 +53,7 @@ WaterLilyReadVTKExt = "ReadVTK"
 WaterLilyWriteVTKExt = "WriteVTK"
 
 [compat]
+CairoMakie = "0.15.6"
 ComponentArrays = "0.15.29"
 DiffEqFlux = "4.4.0"
 DiffEqGPU = "3.8.0"
