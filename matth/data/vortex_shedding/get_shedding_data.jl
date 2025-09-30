@@ -1,4 +1,5 @@
 using WaterLily
+import WaterLily: ∂, @loop
 using Plots
 using TimerOutputs
 using Revise
@@ -12,22 +13,30 @@ includet("../../vortex_shedding.jl")
 sim_shedding = circle_shedding(mem=Array)
 t_end = 50.0
 
-sim_step!(sim_shedding)
-flow = sim_shedding.flow
-jemoeder = WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,WaterLily.quick;ν=flow.ν,perdir=flow.perdir)
+# sim_step!(sim_shedding)
+# flow = sim_shedding.flow
+# jemoeder = WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,WaterLily.quick;ν=flow.ν,perdir=flow.perdir)
 
-println(size(jemoeder))
+# println(size(jemoeder))
 
-# function RHS(flow::Flow{N};λ=WaterLily.quick,udf=nothing,kwargs...)
-#     # Suppose p is a scalar field (pressure field from a simulation)
-#     grad_p = zeros(size(flow.p,1), size(flow.p,2), 2)  # 2D gradient
+function grad(field::AbstractArray)
+    T = eltype(field)
+    sz = size(field)
+    N = ndims(field)
+    grad = zeros(T, sz..., N)  # e.g., zeros(Float32, Nx, Ny, 2)
+    for n in 1:N
+        @loop grad[Tuple(I)..., n] = ∂(n, I, field) over I ∈ inside(field)
+    end
+    return grad
+end
 
-#     @inside grad_p[I,1] = ∂(1, I, flow.p)   # ∂p/∂x
-#     @inside grad_p[I,2] = ∂(2, I, flow.p)   # ∂p/∂y
+function RHS(flow::Flow{N};λ=WaterLily.quick,udf=nothing,kwargs...) where N
+    RHS = inside(WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad(flow.p))
+    return RHS
+end
 
-#     RHS = conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad_p
-
-# end
+test = RHS(sim_shedding.flow)
+println(size(test), typeof(test))
 
 # function run(time_max; sample_instance=25)
 #     while sim_time(sim) < time_max
