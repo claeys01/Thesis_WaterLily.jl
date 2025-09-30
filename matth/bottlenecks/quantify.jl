@@ -36,7 +36,7 @@ function get_forces!(sim,t)
 end
 
 # Simulate through the time range and get forces
-time = 1:0.1:100 # time scale is sim.L/sim.U
+time = 1:0.1:30 # time scale is sim.L/sim.U
 forces = [get_forces!(sim_shedding,t) for t in time];
 
 #Plot it
@@ -45,6 +45,6 @@ plot(time,[first.(forces) last.(forces)],
     xlabel="tU/L",
     ylabel="Pressure force coefficients")
 
-# show(to)
+show(to)
 # display(gif)
 # reset_timer!(to)
