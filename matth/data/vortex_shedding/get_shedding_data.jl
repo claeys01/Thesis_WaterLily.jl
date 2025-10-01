@@ -1,48 +1,27 @@
 using WaterLily
 import WaterLily: ∂, @loop
-using Plots
-using TimerOutputs
 using Revise
 
-
-to = TimerOutput()
-
 includet("../../vortex_shedding.jl")
+includet("../../custom.jl")
 
 
 sim_shedding = circle_shedding(mem=Array)
-t_end = 50.0
+t_end = 100.0
 
-# sim_step!(sim_shedding)
-# flow = sim_shedding.flow
-# jemoeder = WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,WaterLily.quick;ν=flow.ν,perdir=flow.perdir)
-
-# println(size(jemoeder))
-
-function grad(field::AbstractArray)
-    T = eltype(field)
-    sz = size(field)
-    N = ndims(field)
-    grad = zeros(T, sz..., N)  # e.g., zeros(Float32, Nx, Ny, 2)
-    for n in 1:N
-        @loop grad[Tuple(I)..., n] = ∂(n, I, field) over I ∈ inside(field)
+function data_run(sim::AbstractSimulation, time_max; sample_instance=50, verbose=false)
+    RHS_arr = zeros(T, sz..., N)
+    while sim_time(sim) < time_max
+        sim_step!(sim)
+        verbose && sim_info(sim)
+        if sim_time(sim) > sample_instance
+            print("Sampling RHS - ")
+            push!(RHS_arr, RHS(sim.flow))
+        end
     end
-    return grad
+    return RHS_arr
 end
 
-function RHS(flow::Flow{N};λ=WaterLily.quick,udf=nothing,kwargs...) where N
-    RHS = inside(WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad(flow.p))
-    return RHS
-end
-
-test = RHS(sim_shedding.flow)
-println(size(test), typeof(test))
-
-# function run(time_max; sample_instance=25)
-#     while sim_time(sim) < time_max
-#         sim_step!(sim)
-#         if sim_time(sim) < sample_instance
-
-
-#     end
-# end
+RHS_arr = data_run(sim_shedding, t_end; verbose=true)
+println(size(RHS_arr[2]))
+println(size(RHS_arr), typeof(RHS_arr))
