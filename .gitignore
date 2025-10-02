@@ -19,6 +19,7 @@ LocalPreferences.toml
 *.txt
 *.log
 *.json
+*.jld2
 
 # paraview
 *.vti
