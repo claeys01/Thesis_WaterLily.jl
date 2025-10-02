@@ -10,7 +10,7 @@ includet("../vortex_shedding.jl")
 
 
 sim_shedding = circle_shedding(mem=Array)
-t_end = 30.0
+t_end = 50.0
 
 @timeit to "sim_step!" begin
     # gif = sim_gif!(sim_shedding;duration=t_end,clims=(-5,5),plotbody=true, timer=to)
@@ -36,7 +36,7 @@ function get_forces!(sim,t)
 end
 
 # Simulate through the time range and get forces
-time = 1:0.1:30 # time scale is sim.L/sim.U
+time = 1:0.1:100 # time scale is sim.L/sim.U
 forces = [get_forces!(sim_shedding,t) for t in time];
 
 #Plot it
@@ -45,6 +45,6 @@ plot(time,[first.(forces) last.(forces)],
     xlabel="tU/L",
     ylabel="Pressure force coefficients")
 
-show(to)
+# show(to)
 # display(gif)
 # reset_timer!(to)

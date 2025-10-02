@@ -21,7 +21,7 @@ function circle_shedding(Re=250, U=1; mem=Array)
             mem
         )
     perturb!(sim; noise=0.1)
-    sim
+    return sim
 end
 # sim = circle_shedding(mem=CUDA.CuArray)
 
