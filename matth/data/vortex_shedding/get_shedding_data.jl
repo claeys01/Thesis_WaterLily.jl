@@ -1,6 +1,7 @@
 using WaterLily
 import WaterLily: ∂, @loop
 using Revise
+using JLD2
 
 includet("../../vortex_shedding.jl")
 includet("../../custom.jl")
@@ -10,18 +11,23 @@ sim_shedding = circle_shedding(mem=Array)
 t_end = 100.0
 
 function data_run(sim::AbstractSimulation, time_max; sample_instance=50, verbose=false)
-    RHS_arr = zeros(T, sz..., N)
+    data = Dict("RHS" => [], "time" => [], "Δt" => [])
+    sample_counter = 0
     while sim_time(sim) < time_max
         sim_step!(sim)
         verbose && sim_info(sim)
         if sim_time(sim) > sample_instance
+            sample_counter += 1
             print("Sampling RHS - ")
-            push!(RHS_arr, RHS(sim.flow))
+            push!(data["RHS"], vec(RHS(sim.flow)))
+            push!(data["time"], Float32(round(sim_time(sim),digits=4)))
+            push!(data["Δt"], Float32(round(sim.flow.Δt[end], digits=3)))
         end
     end
-    return RHS_arr
+    println("Sampled ", sample_counter," RHS")
+    return data
 end
 
-RHS_arr = data_run(sim_shedding, t_end; verbose=true)
-println(size(RHS_arr[2]))
-println(size(RHS_arr), typeof(RHS_arr))
+RHS_data = data_run(sim_shedding, t_end; verbose=true)
+
+@save "matth/data/RHS_shedding_data.jld2" RHS_data
