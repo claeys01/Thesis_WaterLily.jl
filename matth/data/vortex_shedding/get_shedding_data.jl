@@ -19,7 +19,8 @@ function data_run(sim::AbstractSimulation, time_max; sample_instance=50, verbose
         if sim_time(sim) > sample_instance
             sample_counter += 1
             print("Sampling RHS - ")
-            push!(data["RHS"], vec(RHS(sim.flow)))
+            # println(typeof(RHS(sim.flow)))
+            push!(data["RHS"], RHS(sim.flow))
             push!(data["time"], Float32(round(sim_time(sim),digits=4)))
             push!(data["Δt"], Float32(round(sim.flow.Δt[end], digits=3)))
         end
@@ -30,4 +31,4 @@ end
 
 RHS_data = data_run(sim_shedding, t_end; verbose=true)
 
-@save "matth/data/RHS_shedding_data.jld2" RHS_data
+@save "matth/data/RHS_shedding_data_arr.jld2" RHS_data
