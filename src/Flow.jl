@@ -50,6 +50,7 @@ function conv_diff!(r,u,Φ,λ::F;ν=0.1,perdir=()) where {F}
         # treatment for upper boundary with BCs
         upperBoundary!(r,u,Φ,ν,i,j,N,λ,Val{tagper}())
     end
+    return r
 end
 
 # Neumann BC Building block
@@ -128,14 +129,29 @@ function BDIM!(a::Flow)
     @loop a.u[Ii] += μddn(Ii,a.μ₁,a.f)+a.V[Ii]+a.μ₀[Ii]*a.f[Ii] over Ii ∈ inside_u(size(a.p))
 end
 
-function project!(a::Flow{n},b::AbstractPoisson,w=1) where n
+function project!(a::Flow{n},b::AbstractPoisson,w=1;kwargs...) where n
+    to = get(kwargs, :timer, nothing)
     dt = w*a.Δt[end]
     @inside b.z[I] = div(I,a.u); b.x .*= dt # set source term & solution IC
-    solver!(b)
-    for i ∈ 1:n  # apply solution and unscale to recover pressure
-        @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
+    if isnothing(to)
+        solver!(b; timer=to)
+        for i ∈ 1:n  # apply solution and unscale to recover pressure
+            @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
+        end
+        b.x ./= dt
+    else
+        @timeit to "solver!(b)" begin
+            solver!(b; timer=to)
+        end
+
+        @timeit to "apply pressure correction" begin
+            for i ∈ 1:n  # apply solution and unscale to recover pressure
+                @loop a.u[I,i] -= b.L[I,i]*∂(i,I,b.x) over I ∈ inside(b.x)
+            end
+        end
+        b.x ./= dt
     end
-    b.x ./= dt
+   
 end
 
 """
@@ -145,23 +161,49 @@ Integrate the `Flow` one time step using the [Boundary Data Immersion Method](ht
 and the `AbstractPoisson` pressure solver to project the velocity onto an incompressible flow.
 """
 @fastmath function mom_step!(a::Flow{N},b::AbstractPoisson;λ=quick,udf=nothing,kwargs...) where N
+    to = get(kwargs, :timer, nothing)
     a.u⁰ .= a.u; scale_u!(a,0); t₁ = sum(a.Δt); t₀ = t₁-a.Δt[end]
-    # predictor u → u'
-    @log "p"
-    conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
-    udf!(a,udf,t₀; kwargs...)
-    accelerate!(a.f,t₀,a.g,a.uBC)
-    BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # BC MUST be at t₁
-    a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end]) # convective exit
-    project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-    # corrector u → u¹
-    @log "c"
-    conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
-    udf!(a,udf,t₁; kwargs...)
-    accelerate!(a.f,t₁,a.g,a.uBC)
-    BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-    project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-    push!(a.Δt,CFL(a))
+    if isnothing(to)
+        # predictor
+        @log "p"
+        conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir) # calculates RHS of momentum equation (diff between advection and diffusion terms)
+        udf!(a,udf,t₀; kwargs...) # used for adding custom forces such as gravity 
+        accelerate!(a.f,t₀,a.g,a.uBC) # accounts for moving reference frame and applied acceleration
+        BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
+        project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # applies pressure correction step
+        # corrector
+        @log "c"
+        conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
+        udf!(a,udf,t₁; kwargs...)
+        accelerate!(a.f,t₁,a.g,a.uBC)
+        BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+        push!(a.Δt,CFL(a))
+    else
+        @timeit to "predictor" begin
+            @timeit to "p" @log "p"
+            @timeit to "conv_diff" conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
+            @timeit to "udf" udf!(a,udf,t₀; kwargs...)
+            @timeit to "accelerate" accelerate!(a.f,t₀,a.g,a.uBC)
+            @timeit to "BDIM" BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "exitBC" a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
+            @timeit to "predictor project" begin
+                project!(a,b; timer=to); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            end
+        end
+        @timeit to "corrector" begin
+            @timeit to "c" @log "c"
+            @timeit to "conv_diff" conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
+            @timeit to "udf" udf!(a,udf,t₁; kwargs...)
+            @timeit to "accelerate" accelerate!(a.f,t₁,a.g,a.uBC)
+            @timeit to "BDIM" BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            @timeit to "corrector project" begin
+                project!(a,b,0.5; timer=to); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+            end
+            @timeit to "push" push!(a.Δt,CFL(a))
+        end
+    end
 end
 scale_u!(a,scale) = @loop a.u[Ii] *= scale over Ii ∈ inside_u(size(a.p))
 
