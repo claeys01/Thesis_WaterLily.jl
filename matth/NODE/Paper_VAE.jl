@@ -74,7 +74,7 @@ encoder2d_fast = Chain(
     Conv(kernel_size, 4C_res=>4C_res, pad=padding, stride=1, init=glorot_uniform), x -> leakyrelu(x, 0.2),
 
     # conv_out: halve channels (latent width)
-    Conv(kernel_size, 4C_res=>2C_res, pad=padding, stride=1, init=glorot_uniform),
+    # Conv(kernel_size, 4C_res=>2C_res, pad=padding, stride=1, init=glorot_uniform),
 
     x -> reshape(x, :, size(x, 4)),  # Flatten
 
