@@ -13,7 +13,7 @@ sim_shedding = circle_shedding(mem=Array)
 t_end = 50.0
 
 @timeit to "sim_step!" begin
-    gif = sim_gif!(sim_shedding;duration=t_end,clims=(-5,5),plotbody=true, timer=to)
+    gif = sim_gif!(sim_shedding;duration=t_end,clims=(-5,5),plotbody=true)
     # sim_step!(sim_shedding, t_end; verbose=true, timer=to)
 end
 
