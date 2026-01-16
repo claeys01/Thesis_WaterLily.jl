@@ -161,7 +161,6 @@ Integrate the `Flow` one time step using the [Boundary Data Immersion Method](ht
 and the `AbstractPoisson` pressure solver to project the velocity onto an incompressible flow.
 """
 @fastmath function mom_step!(a::Flow{N},b::AbstractPoisson;λ=quick,udf=nothing,kwargs...) where N
-    to = get(kwargs, :timer, nothing)
     a.u⁰ .= a.u; scale_u!(a,0); t₁ = sum(a.Δt); t₀ = t₁-a.Δt[end]
     # predictor
     @log "p"
