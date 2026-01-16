@@ -163,23 +163,22 @@ and the `AbstractPoisson` pressure solver to project the velocity onto an incomp
 @fastmath function mom_step!(a::Flow{N},b::AbstractPoisson;λ=quick,udf=nothing,kwargs...) where N
     to = get(kwargs, :timer, nothing)
     a.u⁰ .= a.u; scale_u!(a,0); t₁ = sum(a.Δt); t₀ = t₁-a.Δt[end]
-        # predictor
-        @log "p"
-        conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir) # calculates RHS of momentum equation (diff between advection and diffusion terms)
-        udf!(a,udf,t₀; kwargs...) # used for adding custom forces such as gravity 
-        accelerate!(a.f,t₀,a.g,a.uBC) # accounts for moving reference frame and applied acceleration
-        BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-        a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
-        project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # applies pressure correction step
-        # corrector
-        @log "c"
-        conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
-        udf!(a,udf,t₁; kwargs...)
-        accelerate!(a.f,t₁,a.g,a.uBC)
-        BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-        project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-        push!(a.Δt,CFL(a))
-    end
+    # predictor
+    @log "p"
+    conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir) # calculates RHS of momentum equation (diff between advection and diffusion terms)
+    udf!(a,udf,t₀; kwargs...) # used for adding custom forces such as gravity 
+    accelerate!(a.f,t₀,a.g,a.uBC) # accounts for moving reference frame and applied acceleration
+    BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+    a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
+    project!(a,b); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁) # applies pressure correction step
+    # corrector
+    @log "c"
+    conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
+    udf!(a,udf,t₁; kwargs...)
+    accelerate!(a.f,t₁,a.g,a.uBC)
+    BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+    project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
+    push!(a.Δt,CFL(a))
 end
 scale_u!(a,scale) = @loop a.u[Ii] *= scale over Ii ∈ inside_u(size(a.p))
 
