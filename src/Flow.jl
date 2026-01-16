@@ -163,7 +163,6 @@ and the `AbstractPoisson` pressure solver to project the velocity onto an incomp
 @fastmath function mom_step!(a::Flow{N},b::AbstractPoisson;λ=quick,udf=nothing,kwargs...) where N
     to = get(kwargs, :timer, nothing)
     a.u⁰ .= a.u; scale_u!(a,0); t₁ = sum(a.Δt); t₀ = t₁-a.Δt[end]
-    if isnothing(to)
         # predictor
         @log "p"
         conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir) # calculates RHS of momentum equation (diff between advection and diffusion terms)
@@ -180,29 +179,6 @@ and the `AbstractPoisson` pressure solver to project the velocity onto an incomp
         BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
         project!(a,b,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
         push!(a.Δt,CFL(a))
-    else
-        @timeit to "predictor" begin
-            @timeit to "p" @log "p"
-            @timeit to "conv_diff" conv_diff!(a.f,a.u⁰,a.σ,λ;ν=a.ν,perdir=a.perdir)
-            @timeit to "udf" udf!(a,udf,t₀; kwargs...)
-            @timeit to "accelerate" accelerate!(a.f,t₀,a.g,a.uBC)
-            @timeit to "BDIM" BDIM!(a); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-            @timeit to "exitBC" a.exitBC && exitBC!(a.u,a.u⁰,a.Δt[end])
-            @timeit to "predictor project" begin
-                project!(a,b; timer=to); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-            end
-        end
-        @timeit to "corrector" begin
-            @timeit to "c" @log "c"
-            @timeit to "conv_diff" conv_diff!(a.f,a.u,a.σ,λ;ν=a.ν,perdir=a.perdir)
-            @timeit to "udf" udf!(a,udf,t₁; kwargs...)
-            @timeit to "accelerate" accelerate!(a.f,t₁,a.g,a.uBC)
-            @timeit to "BDIM" BDIM!(a); scale_u!(a,0.5); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-            @timeit to "corrector project" begin
-                project!(a,b,0.5; timer=to); BC!(a.u,a.uBC,a.exitBC,a.perdir,t₁)
-            end
-            @timeit to "push" push!(a.Δt,CFL(a))
-        end
     end
 end
 scale_u!(a,scale) = @loop a.u[Ii] *= scale over Ii ∈ inside_u(size(a.p))
